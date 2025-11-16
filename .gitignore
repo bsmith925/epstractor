@@ -8,3 +8,26 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Credentials - NEVER commit these!
+credentials*
+*.token.json
+*_saved.json
+service-account*.json
+
+# datasets - raw downloads
+downloads/datasets/
+
+# datasets - converted parquet files
+huggingface/datasets/epstractor/data/
+
+# datasets - artifacts (zip files)
+huggingface/artifacts/
+
+# datasets - legacy parquet directory (unused)
+huggingface/parquet/
