@@ -19,17 +19,13 @@ size_categories:
   - 10K<n<100K
 configs:
   - config_name: epstein_estate_2025_09
-    data_files:
-      - split: train
-        path: data/epstein_estate_2025_09/*.parquet
+    data_files: data/epstein_estate_2025_09/*.parquet
   - config_name: epstein_estate_2025_11
-    data_files:
-      - split: train
-        path: data/epstein_estate_2025_11/*.parquet
+    data_files: data/epstein_estate_2025_11/*.parquet
   - config_name: house_doj_2025_09
-    data_files:
-      - split: train
-        path: data/house_doj_2025_09/*.parquet
+    data_files: data/house_doj_2025_09/*.parquet
+  - config_name: large_files
+    data_files: data/large_files/*.parquet
 ---
 
 # Epstractor: Epstein Archives Dataset
@@ -38,11 +34,12 @@ A comprehensive archive of documents, images, audio, and video files from multip
 
 ## Dataset Description
 
-This dataset contains **59,420 files** totaling **115.23 GB** from three major document releases:
+This dataset contains **59,420 files** totaling **115.23 GB** from three major document releases, plus 2 large videos (40GB) available via a separate config:
 
 - **Epstein Estate 2025-09**: 5 files, 0.09 GB
 - **Epstein Estate 2025-11**: 26,035 files, 36.56 GB  
 - **House DOJ 2025-09**: 33,380 files, 78.58 GB
+- **Large Files**: 2 videos (>2GB each), 40 GB - *separate config*
 
 ### File Types
 
@@ -60,15 +57,21 @@ The dataset is organized by source for flexible loading:
 ```
 data/
 ├── epstein_estate_2025_09/
-│   └── train-00000-of-00001.parquet (1 shard, 0.09 GB)
+│   └── epstein_estate_2025_09-00000-of-00001.parquet (1 shard, 0.09 GB)
 ├── epstein_estate_2025_11/
-│   ├── train-00000-of-00075.parquet
-│   ├── train-00001-of-00075.parquet
+│   ├── epstein_estate_2025_11-00000-of-00075.parquet
+│   ├── epstein_estate_2025_11-00001-of-00075.parquet
 │   └── ... (75 shards, 36.56 GB)
-└── house_doj_2025_09/
-    ├── train-00000-of-00060.parquet
-    ├── train-00001-of-00060.parquet
-    └── ... (60 shards, 78.58 GB)
+├── house_doj_2025_09/
+│   ├── house_doj_2025_09-00000-of-00060.parquet
+│   ├── house_doj_2025_09-00001-of-00060.parquet
+│   └── ... (60 shards, 78.58 GB)
+└── large_files/
+    └── large_files.parquet (metadata for 2 large videos)
+
+large_files/
+├── DOJ-OGR-00022168.MP4 (20 GB)
+└── DOJ-OGR-00022169.MP4 (20 GB)
 ```
 
 ### Data Structure
@@ -107,23 +110,25 @@ This is **not scraped, leaked, or proprietary content** - all materials were int
 
 ## Usage
 
-The dataset is organized by source in separate folders, allowing you to load all data or specific sources:
+The dataset is organized by source as separate configs, allowing you to load all data or specific sources:
 
 ```python
 from datasets import load_dataset
 
-# Load ALL sources (136 shards, 59,420 files)
-dataset = load_dataset("bsmith925/epstractor")
+# Load ALL sources as a DatasetDict (136 shards, 59,420 files)
+dataset = load_dataset("public-records-research/epstractor-raw")
+# Returns: {"epstein_estate_2025_09": Dataset, "epstein_estate_2025_11": Dataset, "house_doj_2025_09": Dataset}
 
-# Load ONLY a specific source using data_files pattern
-estate_2025_11 = load_dataset("bsmith925/epstractor", 
-                              data_files="data/epstein_estate_2025_11/*.parquet")
+# Access a specific source
+estate_2025_11 = dataset["epstein_estate_2025_11"]
+house_doj = dataset["house_doj_2025_09"]
 
-house_doj = load_dataset("bsmith925/epstractor",
-                         data_files="data/house_doj_2025_09/*.parquet")
+# OR load ONLY a specific source directly
+estate_2025_11 = load_dataset("public-records-research/epstractor-raw", name="epstein_estate_2025_11")
+house_doj = load_dataset("public-records-research/epstractor-raw", name="house_doj_2025_09")
 
 # Access a single file
-row = dataset['train'][0]
+row = estate_2025_11[0]
 print(f"Path: {row['path']}")
 print(f"Source: {row['source']}")
 print(f"Type: {row['file_type']}")
@@ -138,9 +143,57 @@ if row['content_available']:
         f.write(row['content'])
 
 # Filter by file type
-images = dataset['train'].filter(lambda x: x['file_type'] == 'image')
+images = estate_2025_11.filter(lambda x: x['file_type'] == 'image')
 print(f"Total images: {len(images)}")
+
+# Combine all sources if needed
+from datasets import concatenate_datasets
+combined = concatenate_datasets([
+    dataset["epstein_estate_2025_09"],
+    dataset["epstein_estate_2025_11"],
+    dataset["house_doj_2025_09"]
+])
 ```
+
+## Large Files
+
+Two video files exceed PyArrow's 2GB binary limit and are provided via a separate `large_files` config:
+
+```python
+from datasets import load_dataset
+from huggingface_hub import hf_hub_download
+
+# Load the large_files config
+videos = load_dataset("public-records-research/epstractor-raw", name="large_files")
+
+# List available videos (no split needed - returns Dataset directly)
+for video in videos:
+    print(f"{video['file_id']}: {video['file_size'] / 1_073_741_824:.1f} GB")
+    print(f"  Path: {video['path']}")
+    print(f"  Repo path: {video['repo_path']}")
+
+# Download a specific video
+video = videos[0]
+local_path = hf_hub_download(
+    repo_id="public-records-research/epstractor-raw",
+    repo_type="dataset",
+    filename=video['repo_path']
+)
+# Now use local_path with your video player or processing library
+```
+
+### large_files Schema
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `file_id` | string | Stable identifier for the video |
+| `source` | string | Source dataset (e.g., "house_doj_2025_09") |
+| `path` | string | Original path in source archive |
+| `file_size` | int64 | Size in bytes |
+| `extension` | string | File extension |
+| `file_type` | string | "video" |
+| `repo_path` | string | Path to download from repo |
+| `content_available` | bool | False (not embedded in parquet) |
 
 ## Dataset Creation
 
@@ -161,7 +214,7 @@ Files were converted to Parquet format using PyArrow with:
 - Binary content preservation
 - File metadata extraction
 
-**Note**: 2 files exceeding 2GB (PyArrow's binary value limit) are included with metadata only. Their `content` field is null and `content_available` is false.
+**Large Files**: 2 video files exceeding 2GB (PyArrow's binary value limit) are available via the separate `large_files` config. See the "Large Files" section above for details.
 
 ## Considerations
 
@@ -184,7 +237,7 @@ Individual documents may be subject to additional restrictions or copyright clai
   author={Various Government Sources},
   year={2025},
   publisher={Hugging Face},
-  howpublished={\url{https://huggingface.co/datasets/bsmith925/epstractor}},
+  howpublished={\url{https://huggingface.co/datasets/public-records-research/epstractor-raw}},
   note={Aggregated from Epstein Estate releases and DOJ FOIA materials}
 }
 ```

@@ -24,7 +24,7 @@ PY ?= uv run python
 ACTIONS := parquet
 
 # Reserved targets that shouldn't be treated as configs
-RESERVED := dedupe download-epstein help hf-upload upload-dataset validate-dataset
+RESERVED := dedupe download-epstein help hf-upload hf-update-readme upload-dataset validate-dataset
 
 # Parse command-line goals
 CONFIG_GOAL := $(firstword $(filter-out $(ACTIONS) $(RESERVED),$(MAKECMDGOALS)))
@@ -72,6 +72,13 @@ upload-dataset:
 .PHONY: validate-dataset
 validate-dataset:
 	$(PY) -m huggingface.validate_dataset
+
+# ============================================================================
+# Update README on HuggingFace Hub
+# ============================================================================
+.PHONY: hf-update-readme
+hf-update-readme:
+	$(PY) -m huggingface.update_readme
 
 # ============================================================================
 # Dataset Download

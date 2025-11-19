@@ -132,12 +132,6 @@ parquet:
 
 **Important**: Never commit credentials to git!
 
-The following files are automatically ignored:
-- `credentials*.json` - OAuth2 credentials
-- `*.token.json` - OAuth2 tokens
-- `.env` - Environment variables
-- `*_saved.json` - Saved credentials
-
 ## License
 
 See individual dataset licenses. This tool is provided as-is for working with publicly available government documents.

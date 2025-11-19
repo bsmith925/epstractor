@@ -66,11 +66,20 @@ def validate_dataset(
         if expected_subsets:
             for subset_name in expected_subsets:
                 console.print(f"  Loading {subset_name} (streaming)...")
-                dataset[subset_name] = load_dataset(
+                loaded = load_dataset(
                     repo_id, 
                     name=subset_name, 
                     streaming=True
                 )
+                # Handle both old structure (with splits) and new structure (no splits)
+                # If it's a DatasetDict, extract the first split; otherwise use directly
+                if hasattr(loaded, 'keys') and callable(loaded.keys):
+                    # It's a DatasetDict with splits - take the first one
+                    split_name = list(loaded.keys())[0]
+                    dataset[subset_name] = loaded[split_name]
+                else:
+                    # It's a direct Dataset (no splits)
+                    dataset[subset_name] = loaded
         else:
             results["errors"].append("No expected subsets provided")
             return results
@@ -105,7 +114,9 @@ def validate_dataset(
     
     # 3. Sample and validate each subset
     console.print("[bold]Sampling and Validating Data:[/bold]\n")
-    expected_columns = {
+    
+    # Define expected schemas for different config types
+    regular_schema = {
         "path": str,
         "source": str,
         "file_type": str,
@@ -115,13 +126,33 @@ def validate_dataset(
         "content_available": bool,
     }
     
+    large_files_schema = {
+        "file_id": str,
+        "source": str,
+        "path": str,
+        "file_size": int,
+        "extension": str,
+        "file_type": str,
+        "repo_path": str,
+        "content_available": bool,
+    }
+    
     for subset_name in available_subsets:
         console.print(f"[cyan]{subset_name}[/cyan]")
         subset = dataset[subset_name]
         
+        # Select appropriate schema for this subset
+        expected_columns = large_files_schema if subset_name == "large_files" else regular_schema
+        
         # Sample rows (with progress) - only take smaller files for speed
-        console.print(f"  [dim]Sampling {sample_size} rows (skipping files >100MB for speed)...[/dim]")
-        max_file_size = 100 * 1024 * 1024  # 10MB limit for sampling (much stricter)
+        # Exception: large_files config only has 2 files, sample them all regardless of size
+        if subset_name == "large_files":
+            console.print(f"  [dim]Sampling all files from {subset_name} (metadata only)...[/dim]")
+            max_file_size = float('inf')  # No size limit for large_files
+        else:
+            console.print(f"  [dim]Sampling {sample_size} rows (skipping files >100MB for speed)...[/dim]")
+            max_file_size = 100 * 1024 * 1024  # 10MB limit for sampling (much stricter)
+        
         samples = []
         skipped_large = 0
         checked = 0
@@ -175,6 +206,31 @@ def validate_dataset(
         
         console.print(f"  [green]✓ Schema correct[/green]")
         
+        # For large_files config, validate repo_path format
+        if subset_name == "large_files":
+            invalid_paths = [
+                s for s in samples 
+                if not s.get("repo_path", "").startswith("large_files/")
+            ]
+            if invalid_paths:
+                error = f"{subset_name}: Found {len(invalid_paths)} files with invalid repo_path (should start with 'large_files/')"
+                results["errors"].append(error)
+                console.print(f"  [red]✗ {error}[/red]")
+                # Show example
+                if invalid_paths:
+                    console.print(f"    [dim]Example: {invalid_paths[0].get('repo_path', 'N/A')}[/dim]")
+            else:
+                console.print(f"  [green]✓ All repo_path values correctly formatted[/green]")
+            
+            # Validate content_available is False for all large_files
+            has_content = [s for s in samples if s.get("content_available", True)]
+            if has_content:
+                warning = f"{subset_name}: Found {len(has_content)} files with content_available=True (should be False)"
+                results["warnings"].append(warning)
+                console.print(f"  [yellow]⚠ {warning}[/yellow]")
+            else:
+                console.print(f"  [green]✓ All files have content_available=False[/green]")
+        
         # Check for unwanted files
         unwanted_count = sum(
             1 for sample in samples 
@@ -219,6 +275,11 @@ def validate_dataset(
         test_images = []
         
         for subset_name in available_subsets:
+            # Skip large_files config - it doesn't have embedded content
+            if subset_name == "large_files":
+                console.print(f"  [dim]Skipping {subset_name} (no embedded content)[/dim]")
+                continue
+                
             subset = dataset[subset_name]
             for sample in subset.take(sample_size):
                 if sample["extension"] == ".pdf" and sample["content_available"] and sample["content"]:
@@ -301,13 +362,13 @@ def main() -> int:
     )
     parser.add_argument(
         "--repo-id",
-        default="bsmith925/epstractor",
-        help="HuggingFace dataset repository ID (default: bsmith925/epstractor)",
+        default="public-records-research/epstractor-raw",
+        help="HuggingFace dataset repository ID (default: public-records-research/epstractor-raw)",
     )
     parser.add_argument(
         "--expected-subsets",
         nargs="+",
-        default=["epstein_estate_2025_09", "epstein_estate_2025_11", "house_doj_2025_09"],
+        default=["epstein_estate_2025_09", "epstein_estate_2025_11", "house_doj_2025_09", "large_files"],
         help="Expected subset names",
     )
     parser.add_argument(
