@@ -1,0 +1,13 @@
+# downloads/configs/epstein_estate_2025_11.yaml
+source: epstein_estate_2025_11
+description: >
+  House Oversight - Epstein estate documents (Seventh Production),
+  approximately 20,000 pages, released November 12, 2025.
+
+output_dir: downloads/datasets
+subdir: epstein_estate_2025_11
+
+items:
+  - kind: gdrive_folder
+    folder_id: "1hTNH5woIRio578onLGElkTWofUSWRoH_"
+    recursive: true

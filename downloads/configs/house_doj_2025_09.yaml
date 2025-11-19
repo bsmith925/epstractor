@@ -1,0 +1,13 @@
+# downloads/configs/house_doj_2025_09.yaml
+source: house_doj_2025_09
+description: >
+  House Oversight - DOJ Epstein records (first production, ~33,295 pages)
+  released September 2, 2025.
+
+output_dir: downloads/datasets
+subdir: house_doj_2025_09
+
+items:
+  - kind: gdrive_folder
+    folder_id: "1TrGxDGQLDLZu1vvvZDBAh-e7wN3y6Hoz"
+    recursive: true

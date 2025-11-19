@@ -1,0 +1,30 @@
+repo_id: bsmith925/epstractor
+branch: main
+message: "Add Epstein dataset archives"
+
+roots:
+  - downloads/datasets
+
+# Explicit dataset selection
+include:
+  - epstein_estate_2025_09
+  - epstein_estate_2025_11
+  - house_doj_2025_09
+patterns: []
+exclude: []
+
+# Parquet conversion settings (recommended for HF Hub)
+parquet:
+  output_dir: huggingface/datasets/epstractor/data  # Output directory for parquet files
+  max_shard_size_mb: 500  # MB per shard
+  batch_size: 100  # Files per batch (reduced for 32GB RAM systems)
+  exclude_patterns:
+    - .manifest.json
+    - __MACOSX
+    - .DS_Store
+    - dedupe_report.json
+  
+  # Memory optimization notes:
+  # - batch_size=100 processes 100 files at a time (~230MB for 2.3MB avg files)
+  # - For systems with <16GB RAM, consider reducing batch_size to 50
+  # - For systems with >64GB RAM, can increase to 200-500 for faster processing
